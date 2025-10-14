@@ -1,15 +1,27 @@
 # Kubernetes Load Balancer Demo with Zone-Aware Routing
 
-This project demonstrates **Spring Cloud Kubernetes LoadBalancer** with **zone-aware routing** using RestTemplate. It includes a complete local test environment using Kind (Kubernetes in Docker) that significantly speeds up the development loop.
+This project demonstrates **zone-aware load balancing** with Spring Cloud Kubernetes and provides **three working implementations** after discovering that the built-in `ZonePreferenceServiceInstanceListSupplier` doesn't work with Kubernetes Discovery.
+
+## 🚨 Key Finding
+
+**Spring Cloud's built-in zone preference doesn't work with Spring Cloud Kubernetes Discovery** because zone information is stored in `podMetadata()` but the built-in mechanism only checks `getMetadata()`. 
+
+This repository provides:
+- ✅ **Three working implementations** achieving 100% zone-aware routing
+- ✅ Complete local test environment using Kind
+- ✅ Detailed documentation of the issue and workarounds
+- ✅ Ready-to-submit GitHub issue for Spring Cloud team
+
+See `SPRING_CLOUD_ISSUE.md` and `FINDINGS_SUMMARY.md` for complete details.
 
 ## 🎯 What This Demo Shows
 
+- ✅ Three different working approaches for zone-aware load balancing
 - ✅ Spring Cloud Kubernetes LoadBalancer with `@LoadBalanced` RestTemplate
-- ✅ Zone-aware load balancing (traffic stays within the same availability zone)
-- ✅ Local Kubernetes cluster with simulated zones
+- ✅ Local Kubernetes cluster with simulated availability zones
 - ✅ Fast development loop with quick rebuild scripts
-- ✅ Multiple service instances across different zones
-- ✅ Testing endpoints to verify load balancing behavior
+- ✅ Comprehensive testing comparing all implementations
+- ✅ Detailed investigation of why built-in zone preference fails
 
 ## 📋 Prerequisites
 
@@ -56,9 +68,42 @@ brew install kubectl kind jq maven
 
 ### Components
 
-1. **Sample Service** - A simple REST service that returns information about itself (pod name, zone, IP)
-2. **Client Service** - Uses `@LoadBalanced` RestTemplate to call sample-service with zone-aware load balancing
-3. **Kind Cluster** - Local Kubernetes cluster with nodes labeled as different zones
+#### Sample Service (`sample-service/`)
+A simple REST service that provides information about itself:
+- Returns pod name, zone, IP address
+- Deployed with 2 replicas in zone-a and 2 replicas in zone-b (4 total instances)
+- Exposes `/info` endpoint for testing
+
+#### Client Services (Three Different Implementations)
+
+This project includes **three different client implementations** to demonstrate various approaches for achieving zone-aware load balancing:
+
+1. **Custom Client** (`client-service/`) - ✅ **100% Zone-Aware**
+   - **Approach**: Queries Kubernetes API for pod labels by IP address
+   - **How**: Uses `KubernetesClient` to fetch zone from pod labels directly
+   - **Pros**: Works perfectly, uses standard `topology.kubernetes.io/zone` label
+   - **Cons**: Requires extra API calls per instance
+
+2. **Simple Client** (`simple-client-service/`) - ✅ **100% Zone-Aware** 
+   - **Approach**: Accesses `DefaultKubernetesServiceInstance.podMetadata()` directly
+   - **How**: Custom supplier that reads zone from the pod metadata structure
+   - **Pros**: No extra API calls, uses existing discovery data, cleanest approach
+   - **Cons**: Requires Kubernetes-specific code
+   - **Note**: This demonstrates the fix for Spring Cloud's built-in zone preference
+
+3. **Slice Client** (`slice-client-service/`) - ✅ **100% Zone-Aware**
+   - **Approach**: Uses Kubernetes EndpointSlices API for zone information
+   - **How**: Queries EndpointSlices which have native zone support
+   - **Pros**: Kubernetes-native approach, future-proof (EndpointSlices are standard)
+   - **Cons**: Requires additional RBAC for endpointslices resource
+
+> **Why Three Implementations?**  
+> We discovered that Spring Cloud's built-in `ZonePreferenceServiceInstanceListSupplier` doesn't work with Spring Cloud Kubernetes Discovery (see `SPRING_CLOUD_ISSUE.md`). These three implementations demonstrate different working approaches to achieve 100% zone-aware routing.
+
+#### Infrastructure
+- **Kind Cluster** - Local Kubernetes cluster with nodes labeled as different zones (zone-a, zone-b)
+- **RBAC** - Service accounts and roles for Kubernetes API access
+- **Namespace** - All resources deployed in `lb-demo` namespace
 
 ## 🚀 Quick Start
 
@@ -77,33 +122,62 @@ This will:
 
 ### Step 2: Build and Deploy Applications
 
-Build the applications and deploy them to the cluster:
+You can deploy any or all of the client implementations:
 
+**Deploy Custom Client** (Pod label queries):
 ```bash
 ./scripts/build-and-deploy.sh
 ```
 
-This will:
-- Build both services with Maven
+**Deploy Simple Client** (podMetadata access - recommended):
+```bash
+./scripts/build-and-deploy-simple.sh
+```
+
+**Deploy Slice Client** (EndpointSlices API):
+```bash
+./scripts/build-and-deploy-slice.sh
+```
+
+Or deploy all at once:
+```bash
+./scripts/build-and-deploy.sh
+./scripts/build-and-deploy-simple.sh
+./scripts/build-and-deploy-slice.sh
+```
+
+Each script will:
+- Build the service(s) with Maven
 - Create Docker images
 - Load images into the Kind cluster
-- Deploy all Kubernetes resources
+- Deploy Kubernetes resources
 - Wait for all pods to be ready
 
 ### Step 3: Test Zone-Aware Load Balancing
 
-Run the automated test:
+Run the automated test to compare all implementations:
 
 ```bash
 ./scripts/test-loadbalancing.sh
 ```
 
-This will:
-- Make 20 calls from the zone-a client
-- Make 20 calls from the zone-b client
-- Show the distribution of calls and zone preferences
+This will test **all deployed client implementations** and show:
+- Results from Custom Client (if deployed)
+- Results from Simple Client (if deployed)  
+- Results from Slice Client (if deployed)
+- Distribution of calls across pods and zones
+- Same-zone vs cross-zone call percentages
 
-**Expected Result:** You should see that clients primarily call services in their own zone (close to 100% same-zone calls).
+**Expected Result:** All implementations should show **100% same-zone routing**:
+```json
+{
+  "clientZone": "zone-a",
+  "totalCalls": 20,
+  "sameZoneCalls": 20,
+  "crossZoneCalls": 0,
+  "sameZonePercentage": "100.0%"
+}
+```
 
 ## 🧪 Manual Testing
 
@@ -264,48 +338,103 @@ The `@LoadBalanced` annotation enables:
 
 ```
 kubernetes-loadbalancer/
-├── sample-service/              # The service being called
-│   ├── src/main/java/
-│   │   └── com/example/sampleservice/
-│   │       ├── SampleServiceApplication.java
-│   │       └── controller/
-│   │           └── InfoController.java
+├── sample-service/                    # Target service (provides /info endpoint)
+│   ├── src/main/java/.../controller/
+│   │   └── InfoController.java
 │   ├── Dockerfile
 │   └── pom.xml
-├── client-service/              # The client with load balancing
-│   ├── src/main/java/
-│   │   └── com/example/clientservice/
-│   │       ├── ClientServiceApplication.java
-│   │       ├── config/
-│   │       │   ├── RestTemplateConfig.java
-│   │       │   └── LoadBalancerConfig.java
-│   │       └── controller/
-│   │           └── TestController.java
+│
+├── client-service/                    # Custom Client (Pod label queries)
+│   ├── src/main/java/.../
+│   │   ├── config/
+│   │   │   ├── LoadBalancerConfig.java
+│   │   │   └── KubernetesClientConfig.java
+│   │   ├── loadbalancer/
+│   │   │   └── CustomZonePreferenceServiceInstanceListSupplier.java
+│   │   └── controller/TestController.java
 │   ├── Dockerfile
 │   └── pom.xml
-├── k8s/                         # Kubernetes manifests
+│
+├── simple-client-service/             # Simple Client (podMetadata) - RECOMMENDED
+│   ├── src/main/java/.../config/
+│   │   ├── SimpleLoadBalancerConfig.java
+│   │   └── LoggingServiceInstanceListSupplier.java  # ⭐ Key implementation
+│   ├── Dockerfile
+│   └── pom.xml
+│
+├── slice-client-service/              # Slice Client (EndpointSlices API)
+│   ├── src/main/java/.../config/
+│   │   ├── SliceLoadBalancerConfig.java
+│   │   └── EndpointSliceZoneServiceInstanceListSupplier.java
+│   ├── Dockerfile
+│   └── pom.xml
+│
+├── k8s/                               # Kubernetes manifests
 │   ├── namespace.yaml
-│   ├── rbac.yaml
+│   ├── rbac.yaml                      # Includes endpointslices permissions
 │   ├── sample-service.yaml
-│   └── client-service.yaml
-├── scripts/                     # Helper scripts
-│   ├── setup-kind-cluster.sh
-│   ├── build-and-deploy.sh
-│   ├── test-loadbalancing.sh
-│   ├── dev-rebuild.sh
+│   ├── client-service.yaml
+│   ├── simple-client-service.yaml
+│   └── slice-client-service.yaml
+│
+├── scripts/                           # Helper scripts
+│   ├── setup-kind-cluster.sh          # Create Kind cluster
+│   ├── build-and-deploy.sh            # Build/deploy custom client
+│   ├── build-and-deploy-simple.sh     # Build/deploy simple client
+│   ├── build-and-deploy-slice.sh      # Build/deploy slice client
+│   ├── test-loadbalancing.sh          # Compare all implementations
+│   ├── debug-simple-client.sh         # Remote debugging setup
 │   ├── port-forward.sh
 │   ├── logs.sh
 │   └── cleanup.sh
-└── pom.xml                      # Parent POM
+│
+├── SPRING_CLOUD_ISSUE.md              # Ready-to-submit GitHub issue
+├── FINDINGS_SUMMARY.md                # Complete investigation summary
+├── ISSUE_SUBMISSION_GUIDE.md          # How to submit the issue
+├── SOLUTION.md                        # Detailed solution documentation
+├── DEBUG_GUIDE.md                     # Remote debugging instructions
+└── pom.xml                            # Parent POM
 ```
+
+### Key Implementation Files
+
+Each client demonstrates a different approach to accessing zone information:
+
+1. **`client-service/CustomZonePreferenceServiceInstanceListSupplier.java`**
+   - Queries Kubernetes API for pod details by IP
+   - Extracts zone from pod labels
+
+2. **`simple-client-service/LoggingServiceInstanceListSupplier.java`** ⭐ **Recommended**
+   - Accesses `DefaultKubernetesServiceInstance.podMetadata()` directly
+   - Reads zone from the pod labels structure
+
+3. **`slice-client-service/EndpointSliceZoneServiceInstanceListSupplier.java`**
+   - Uses Kubernetes EndpointSlices API
+   - Builds IP-to-zone cache from `endpoint.getZone()`
 
 ## 🧹 Cleanup
 
-When you're done, clean up the Kind cluster:
+Three cleanup options available:
 
+### Quick Cleanup (No Confirmation)
 ```bash
 ./scripts/cleanup.sh
 ```
+Immediately deletes the Kind cluster.
+
+### Safe Cleanup (With Confirmation)
+```bash
+./scripts/destroy-cluster.sh
+```
+Asks for confirmation before deleting the cluster.
+
+### Complete Cleanup (Cluster + Docker Images)
+```bash
+./scripts/cleanup-all.sh
+```
+Deletes cluster and removes all Docker images for this project.
+
+**See** `CLEANUP_GUIDE.md` for detailed information on each cleanup option.
 
 ## 📚 Key Dependencies
 

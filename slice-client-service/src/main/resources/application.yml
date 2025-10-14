@@ -1,0 +1,43 @@
+spring:
+  application:
+    name: slice-client-service
+  cloud:
+    kubernetes:
+      enabled: true
+      client:
+        namespace: lb-demo
+      discovery:
+        enabled: true
+        all-namespaces: false
+        metadata:
+          add-pod-labels: true
+          add-pod-annotations: true
+          labels-prefix: ""
+          annotations-prefix: ""
+        include-not-ready-addresses: false
+      loadbalancer:
+        enabled: true
+        mode: POD  # Use POD mode for zone-aware routing
+    loadbalancer:
+      # This should be the client's zone
+      zone: ${ZONE:unknown}
+
+server:
+  port: 8081
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+  endpoint:
+    health:
+      show-details: always
+
+logging:
+  level:
+    # Enable detailed logging to see what's happening
+    org.springframework.cloud.kubernetes: DEBUG
+    org.springframework.cloud.loadbalancer: DEBUG
+    com.example.sliceclient: DEBUG
+

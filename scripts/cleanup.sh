@@ -1,5 +1,9 @@
 #!/bin/bash
 
+# Quick cluster cleanup (no confirmation)
+# For interactive cleanup with confirmation, use: ./scripts/destroy-cluster.sh
+# For complete cleanup including Docker images, use: ./scripts/cleanup-all.sh
+
 set -e
 
 CLUSTER_NAME="lb-demo"
@@ -8,7 +12,7 @@ echo "================================"
 echo "Cleaning up Kind Cluster"
 echo "================================"
 
-if kind get clusters | grep -q "^${CLUSTER_NAME}$"; then
+if kind get clusters 2>/dev/null | grep -q "^${CLUSTER_NAME}$"; then
     echo "Deleting cluster: ${CLUSTER_NAME}"
     kind delete cluster --name ${CLUSTER_NAME}
     echo "✓ Cluster deleted"
@@ -17,5 +21,8 @@ else
 fi
 
 echo ""
-echo "Cleanup complete!"
+echo "✓ Cleanup complete!"
+echo ""
+echo "To start fresh:"
+echo "  ./scripts/setup-kind-cluster.sh"
 

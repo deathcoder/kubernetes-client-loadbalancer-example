@@ -1,0 +1,56 @@
+spring:
+  application:
+    name: simple-client-service
+  cloud:
+    kubernetes:
+      enabled: true
+      discovery:
+        enabled: true
+        all-namespaces: false
+        metadata:
+          # Try to include as much metadata as possible
+          add-pod-labels: true
+          add-pod-annotations: true
+          labels-prefix: ""
+          annotations-prefix: ""
+          # Try to include pod metadata directly
+          add-ports: true
+        include-not-ready-addresses: false
+        # Try adding specific label filters
+        filter:
+      loadbalancer:
+        enabled: true
+        mode: POD  # POD mode for zone-aware routing
+        # Try to pick up pod metadata including zone
+        cluster:
+          enabled: true
+    loadbalancer:
+      # This should be the client's zone
+      zone: ${ZONE:unknown}
+      # Enable zone preference
+      configurations: zone-preference
+      # Additional configuration attempts
+      zone-preference:
+        enabled: true
+
+server:
+  port: 8081
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+  endpoint:
+    health:
+      show-details: always
+
+logging:
+  level:
+    # Enable detailed logging to see what's happening
+    org.springframework.cloud.kubernetes: DEBUG
+    org.springframework.cloud.loadbalancer: DEBUG
+    com.example.simpleclient: DEBUG
+    # Log the zone preference specifically
+    org.springframework.cloud.loadbalancer.core.ZonePreferenceServiceInstanceListSupplier: TRACE
+
