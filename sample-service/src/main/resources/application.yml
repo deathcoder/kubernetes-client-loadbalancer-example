@@ -1,0 +1,21 @@
+spring:
+  application:
+    name: sample-service
+  cloud:
+    kubernetes:
+      enabled: true
+      discovery:
+        enabled: true
+
+server:
+  port: 8080
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+  endpoint:
+    health:
+      show-details: always
+

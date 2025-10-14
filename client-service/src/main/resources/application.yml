@@ -1,0 +1,44 @@
+spring:
+  application:
+    name: client-service
+  cloud:
+    kubernetes:
+      enabled: true
+      discovery:
+        enabled: true
+        all-namespaces: false
+        metadata:
+          add-pod-labels: true
+          add-pod-annotations: true
+          labels-prefix: ""
+          annotations-prefix: ""
+        include-not-ready-addresses: false
+      loadbalancer:
+        enabled: true
+        mode: POD  # Use POD mode for zone-aware load balancing
+        zone-preference-enabled: true
+    loadbalancer:
+      zone: ${ZONE:unknown}  # Zone preference for load balancing
+      hint-enabled: false
+      health-check:
+        path:
+          default: /actuator/health
+
+server:
+  port: 8081
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+  endpoint:
+    health:
+      show-details: always
+
+logging:
+  level:
+    org.springframework.cloud.kubernetes: DEBUG
+    org.springframework.cloud.loadbalancer: DEBUG
+    com.example.clientservice.loadbalancer: DEBUG
+

@@ -1,0 +1,165 @@
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: sample-service
+  namespace: lb-demo
+  labels:
+    app: sample-service
+spec:
+  selector:
+    app: sample-service
+  ports:
+    - name: http
+      port: 8080
+      targetPort: 8080
+  type: ClusterIP
+---
+# Deployment for zone-a
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: sample-service-zone-a
+  namespace: lb-demo
+  labels:
+    app: sample-service
+    zone: zone-a
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: sample-service
+      zone: zone-a
+  template:
+    metadata:
+      labels:
+        app: sample-service
+        zone: zone-a
+        topology.kubernetes.io/zone: zone-a
+    spec:
+      serviceAccountName: spring-cloud-kubernetes
+      affinity:
+        # Prefer to schedule pods in zone-a nodes
+        nodeAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - weight: 100
+              preference:
+                matchExpressions:
+                  - key: topology.kubernetes.io/zone
+                    operator: In
+                    values:
+                      - zone-a
+      containers:
+        - name: sample-service
+          image: sample-service:latest
+          imagePullPolicy: Never
+          ports:
+            - containerPort: 8080
+              name: http
+          env:
+            - name: ZONE
+              value: "zone-a"
+            - name: POD_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.name
+            - name: POD_IP
+              valueFrom:
+                fieldRef:
+                  fieldPath: status.podIP
+            - name: SPRING_PROFILES_ACTIVE
+              value: "kubernetes"
+          resources:
+            requests:
+              memory: "256Mi"
+              cpu: "250m"
+            limits:
+              memory: "512Mi"
+              cpu: "500m"
+          livenessProbe:
+            httpGet:
+              path: /actuator/health
+              port: 8080
+            initialDelaySeconds: 30
+            periodSeconds: 10
+          readinessProbe:
+            httpGet:
+              path: /actuator/health
+              port: 8080
+            initialDelaySeconds: 20
+            periodSeconds: 5
+---
+# Deployment for zone-b
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: sample-service-zone-b
+  namespace: lb-demo
+  labels:
+    app: sample-service
+    zone: zone-b
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: sample-service
+      zone: zone-b
+  template:
+    metadata:
+      labels:
+        app: sample-service
+        zone: zone-b
+        topology.kubernetes.io/zone: zone-b
+    spec:
+      serviceAccountName: spring-cloud-kubernetes
+      affinity:
+        # Prefer to schedule pods in zone-b nodes
+        nodeAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - weight: 100
+              preference:
+                matchExpressions:
+                  - key: topology.kubernetes.io/zone
+                    operator: In
+                    values:
+                      - zone-b
+      containers:
+        - name: sample-service
+          image: sample-service:latest
+          imagePullPolicy: Never
+          ports:
+            - containerPort: 8080
+              name: http
+          env:
+            - name: ZONE
+              value: "zone-b"
+            - name: POD_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.name
+            - name: POD_IP
+              valueFrom:
+                fieldRef:
+                  fieldPath: status.podIP
+            - name: SPRING_PROFILES_ACTIVE
+              value: "kubernetes"
+          resources:
+            requests:
+              memory: "256Mi"
+              cpu: "250m"
+            limits:
+              memory: "512Mi"
+              cpu: "500m"
+          livenessProbe:
+            httpGet:
+              path: /actuator/health
+              port: 8080
+            initialDelaySeconds: 30
+            periodSeconds: 10
+          readinessProbe:
+            httpGet:
+              path: /actuator/health
+              port: 8080
+            initialDelaySeconds: 20
+            periodSeconds: 5
+
