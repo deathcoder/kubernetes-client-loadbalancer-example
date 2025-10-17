@@ -32,6 +32,14 @@ if kind get clusters 2>/dev/null | grep -q "^${CLUSTER_NAME}$"; then
 else
     echo "✓ Cluster '${CLUSTER_NAME}' does not exist (skipping)"
 fi
+
+# Clean up leftover Kind network
+if docker network ls | grep -q "kind"; then
+    echo "Removing leftover Kind network..."
+    docker network rm kind 2>/dev/null && echo "✓ Kind network removed" || echo "✓ Already removed"
+else
+    echo "✓ No leftover Kind network"
+fi
 echo ""
 
 # Step 2: Remove Docker images

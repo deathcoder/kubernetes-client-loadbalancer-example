@@ -1,0 +1,172 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mp-browse-zone-a
+  namespace: lb-demo
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: mp-browse
+      zone: zone-a
+  template:
+    metadata:
+      labels:
+        app: mp-browse
+        zone: zone-a
+        topology.kubernetes.io/zone: zone-a
+    spec:
+      serviceAccountName: spring-cloud-kubernetes
+      affinity:
+        nodeAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - weight: 100
+              preference:
+                matchExpressions:
+                  - key: topology.kubernetes.io/zone
+                    operator: In
+                    values:
+                      - zone-a
+      containers:
+        - name: mp-browse
+          imagePullPolicy: IfNotPresent
+          image: 268936375139.dkr.ecr.eu-central-1.amazonaws.com/treatwell/mp-browse:local-SNAPSHOT
+          ports:
+            - name: http
+              containerPort: 3335
+            - name: debug
+              containerPort: 5005
+          env:
+            - name: ZONE
+              value: "zone-a"
+            - name: POD_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.name
+            - name: SERVICE_NAME
+              value: "browse-webapp"
+            - name: TW_ENV_TYPE
+              value: "DESKTOP"
+            - name: TW_ENV
+              value: "local-kind"
+            - name: JAVA_HEAP_SIZE
+              value: "512m"
+            - name: AWS_REGION
+              value: eu-west-1
+            - name: AWS_DEFAULT_REGION
+              value: eu-west-1
+            - name: SERVICE_MARKETPLACE_BROWSE_INDEX_INDEXINGENABLED
+              value: "false"
+            - name: SPRING_CLOUD_LOADBALANCER_ENABLED
+              value: "true"
+            - name: SPRING_CLOUD_LOADBALANCER_ZONE
+              value: "zone-a"
+            - name: SPRING_CLOUD_KUBERNETES_DISCOVERY_ENABLED
+              value: "true"
+            - name: SPRING_CLOUD_KUBERNETES_CLIENT_NAMESPACE
+              value: "lb-demo"
+            - name: KUBERNETES_NAMESPACE
+              value: "lb-demo"
+          resources:
+            requests:
+              memory: "512Mi"
+              cpu: "250m"
+            limits:
+              memory: "1Gi"
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mp-browse-zone-b
+  namespace: lb-demo
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: mp-browse
+      zone: zone-b
+  template:
+    metadata:
+      labels:
+        app: mp-browse
+        zone: zone-b
+        topology.kubernetes.io/zone: zone-b
+    spec:
+      serviceAccountName: spring-cloud-kubernetes
+      affinity:
+        nodeAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - weight: 100
+              preference:
+                matchExpressions:
+                  - key: topology.kubernetes.io/zone
+                    operator: In
+                    values:
+                      - zone-b
+      containers:
+        - name: mp-browse
+          imagePullPolicy: IfNotPresent
+          image: 268936375139.dkr.ecr.eu-central-1.amazonaws.com/treatwell/mp-browse:local-SNAPSHOT
+          ports:
+            - name: http
+              containerPort: 3335
+            - name: debug
+              containerPort: 5005
+          env:
+            - name: ZONE
+              value: "zone-b"
+            - name: POD_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.name
+            - name: SERVICE_NAME
+              value: "browse-webapp"
+            - name: TW_ENV_TYPE
+              value: "local"
+            - name: TW_ENV
+              value: "local-kind"
+            - name: JAVA_HEAP_SIZE
+              value: "512m"
+            - name: AWS_REGION
+              value: eu-west-1
+            - name: AWS_DEFAULT_REGION
+              value: eu-west-1
+            - name: SERVICE_MARKETPLACE_BROWSE_INDEX_INDEXINGENABLED
+              value: "false"
+            - name: SPRING_CLOUD_LOADBALANCER_ENABLED
+              value: "true"
+            - name: SPRING_CLOUD_LOADBALANCER_ZONE
+              value: "zone-b"
+            - name: SPRING_CLOUD_KUBERNETES_DISCOVERY_ENABLED
+              value: "true"
+            - name: SPRING_CLOUD_KUBERNETES_CLIENT_NAMESPACE
+              value: "lb-demo"
+            - name: KUBERNETES_NAMESPACE
+              value: "lb-demo"
+          resources:
+            requests:
+              memory: "512Mi"
+              cpu: "250m"
+            limits:
+              memory: "1Gi"
+              cpu: "500m"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: mp-browse
+  namespace: lb-demo
+spec:
+  type: NodePort
+  selector:
+    app: mp-browse
+  ports:
+    - name: http
+      port: 3335
+      targetPort: 3335
+      nodePort: 30080
+    - name: debug
+      port: 5005
+      targetPort: 5005
+      nodePort: 30085
+

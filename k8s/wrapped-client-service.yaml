@@ -1,46 +1,42 @@
----
 apiVersion: v1
 kind: Service
 metadata:
-  name: client-service
+  name: wrapped-client-service
   namespace: lb-demo
   labels:
-    app: client-service
+    app: wrapped-client-service
 spec:
   selector:
-    app: client-service
+    app: wrapped-client-service
   ports:
     - name: http
       port: 8081
       targetPort: 8081
-      nodePort: 30081
-  type: NodePort
+  type: ClusterIP
 ---
-# Client in zone-a
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: client-service-zone-a
+  name: wrapped-client-service-zone-a
   namespace: lb-demo
   labels:
-    app: client-service
+    app: wrapped-client-service
     zone: zone-a
 spec:
   replicas: 1
   selector:
     matchLabels:
-      app: client-service
+      app: wrapped-client-service
       zone: zone-a
   template:
     metadata:
       labels:
-        app: client-service
+        app: wrapped-client-service
         zone: zone-a
         topology.kubernetes.io/zone: zone-a
     spec:
       serviceAccountName: spring-cloud-kubernetes
       affinity:
-        # Prefer to schedule pods in zone-a nodes
         nodeAffinity:
           preferredDuringSchedulingIgnoredDuringExecution:
             - weight: 100
@@ -51,12 +47,12 @@ spec:
                     values:
                       - zone-a
       containers:
-        - name: client-service
-          image: client-service:latest
-          imagePullPolicy: Never
+        - name: wrapped-client-service
+          image: wrapped-client-service:latest
+          imagePullPolicy: IfNotPresent
           ports:
-            - containerPort: 8081
-              name: http
+            - name: http
+              containerPort: 8081
           env:
             - name: ZONE
               value: "zone-a"
@@ -64,15 +60,16 @@ spec:
               valueFrom:
                 fieldRef:
                   fieldPath: metadata.name
-            - name: SPRING_PROFILES_ACTIVE
-              value: "kubernetes"
-          resources:
-            requests:
-              memory: "256Mi"
-              cpu: "250m"
-            limits:
-              memory: "512Mi"
-              cpu: "500m"
+            - name: KUBERNETES_NAMESPACE
+              value: "lb-demo"
+            - name: SPRING_CLOUD_LOADBALANCER_ZONE
+              value: "zone-a"
+            - name: SPRING_CLOUD_KUBERNETES_DISCOVERY_ENABLED
+              value: "true"
+            - name: SPRING_CLOUD_KUBERNETES_CLIENT_NAMESPACE
+              value: "lb-demo"
+            - name: SPRING_CLOUD_LOADBALANCER_ENABLED
+              value: "true"
           livenessProbe:
             httpGet:
               path: /actuator/health
@@ -80,41 +77,43 @@ spec:
             initialDelaySeconds: 90
             periodSeconds: 10
             timeoutSeconds: 5
-            failureThreshold: 3
           readinessProbe:
             httpGet:
               path: /actuator/health
               port: 8081
             initialDelaySeconds: 60
             periodSeconds: 5
-            timeoutSeconds: 5
-            failureThreshold: 3
+            timeoutSeconds: 3
+          resources:
+            requests:
+              memory: "512Mi"
+              cpu: "250m"
+            limits:
+              memory: "1Gi"
 ---
-# Client in zone-b
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: client-service-zone-b
+  name: wrapped-client-service-zone-b
   namespace: lb-demo
   labels:
-    app: client-service
+    app: wrapped-client-service
     zone: zone-b
 spec:
   replicas: 1
   selector:
     matchLabels:
-      app: client-service
+      app: wrapped-client-service
       zone: zone-b
   template:
     metadata:
       labels:
-        app: client-service
+        app: wrapped-client-service
         zone: zone-b
         topology.kubernetes.io/zone: zone-b
     spec:
       serviceAccountName: spring-cloud-kubernetes
       affinity:
-        # Prefer to schedule pods in zone-b nodes
         nodeAffinity:
           preferredDuringSchedulingIgnoredDuringExecution:
             - weight: 100
@@ -125,12 +124,12 @@ spec:
                     values:
                       - zone-b
       containers:
-        - name: client-service
-          image: client-service:latest
-          imagePullPolicy: Never
+        - name: wrapped-client-service
+          image: wrapped-client-service:latest
+          imagePullPolicy: IfNotPresent
           ports:
-            - containerPort: 8081
-              name: http
+            - name: http
+              containerPort: 8081
           env:
             - name: ZONE
               value: "zone-b"
@@ -138,15 +137,16 @@ spec:
               valueFrom:
                 fieldRef:
                   fieldPath: metadata.name
-            - name: SPRING_PROFILES_ACTIVE
-              value: "kubernetes"
-          resources:
-            requests:
-              memory: "256Mi"
-              cpu: "250m"
-            limits:
-              memory: "512Mi"
-              cpu: "500m"
+            - name: KUBERNETES_NAMESPACE
+              value: "lb-demo"
+            - name: SPRING_CLOUD_LOADBALANCER_ZONE
+              value: "zone-b"
+            - name: SPRING_CLOUD_KUBERNETES_DISCOVERY_ENABLED
+              value: "true"
+            - name: SPRING_CLOUD_KUBERNETES_CLIENT_NAMESPACE
+              value: "lb-demo"
+            - name: SPRING_CLOUD_LOADBALANCER_ENABLED
+              value: "true"
           livenessProbe:
             httpGet:
               path: /actuator/health
@@ -154,13 +154,18 @@ spec:
             initialDelaySeconds: 90
             periodSeconds: 10
             timeoutSeconds: 5
-            failureThreshold: 3
           readinessProbe:
             httpGet:
               path: /actuator/health
               port: 8081
             initialDelaySeconds: 60
             periodSeconds: 5
-            timeoutSeconds: 5
-            failureThreshold: 3
+            timeoutSeconds: 3
+          resources:
+            requests:
+              memory: "512Mi"
+              cpu: "250m"
+            limits:
+              memory: "1Gi"
+              cpu: "500m"
 

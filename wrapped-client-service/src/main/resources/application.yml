@@ -1,0 +1,39 @@
+spring:
+  application:
+    name: wrapped-client-service
+  cloud:
+    kubernetes:
+      discovery:
+        enabled: true
+        all-namespaces: false
+        include-not-ready-addresses: false
+        metadata:
+          add-pod-labels: true
+          add-pod-annotations: true
+      client:
+        namespace: ${KUBERNETES_NAMESPACE:lb-demo}
+    loadbalancer:
+      enabled: true
+      zone: ${ZONE:unknown}
+    discovery:
+      enabled: true
+
+server:
+  port: 8081
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+  endpoint:
+    health:
+      show-details: always
+
+logging:
+  level:
+    root: INFO
+    com.example.wrappedclient: DEBUG
+    org.springframework.cloud.kubernetes: DEBUG
+    org.springframework.cloud.loadbalancer: DEBUG
+

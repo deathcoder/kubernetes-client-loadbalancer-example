@@ -17,6 +17,7 @@
         <module>client-service</module>
         <module>simple-client-service</module>
         <module>slice-client-service</module>
+        <module>wrapped-client-service</module>
     </modules>
 
     <properties>

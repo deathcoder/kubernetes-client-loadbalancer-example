@@ -97,8 +97,15 @@ This project includes **three different client implementations** to demonstrate 
    - **Pros**: Kubernetes-native approach, future-proof (EndpointSlices are standard)
    - **Cons**: Requires additional RBAC for endpointslices resource
 
-> **Why Three Implementations?**  
-> We discovered that Spring Cloud's built-in `ZonePreferenceServiceInstanceListSupplier` doesn't work with Spring Cloud Kubernetes Discovery (see `SPRING_CLOUD_ISSUE.md`). These three implementations demonstrate different working approaches to achieve 100% zone-aware routing.
+4. **MP-Browse** (`mp-browse/`) - 🏭 **Production Application Testing**
+   - **Approach**: Your actual production application (browse-webapp) deployed in the test cluster
+   - **How**: Uses the same EndpointSlice-based zone-aware load balancing as slice-client
+   - **Pros**: Test your real application locally before deploying to staging/production
+   - **Use Case**: Validate that zone-aware routing works with your actual app and configuration
+   - **Note**: You provide your own JAR file - see `mp-browse/README.md` for setup instructions
+
+> **Why Three Implementations (+ Production App)?**  
+> We discovered that Spring Cloud's built-in `ZonePreferenceServiceInstanceListSupplier` doesn't work with Spring Cloud Kubernetes Discovery (see `SPRING_CLOUD_ISSUE.md`). These three implementations demonstrate different working approaches to achieve 100% zone-aware routing. The mp-browse integration allows you to test your actual production application in the same local environment.
 
 #### Infrastructure
 - **Kind Cluster** - Local Kubernetes cluster with nodes labeled as different zones (zone-a, zone-b)
@@ -139,11 +146,21 @@ You can deploy any or all of the client implementations:
 ./scripts/build-and-deploy-slice.sh
 ```
 
+**Deploy MP-Browse** (Your Production Application):
+```bash
+# First, copy your JAR file
+cp /path/to/browse-webapp.jar mp-browse/app.jar
+
+# Then deploy
+./scripts/build-and-deploy-mp-browse.sh
+```
+
 Or deploy all at once:
 ```bash
 ./scripts/build-and-deploy.sh
 ./scripts/build-and-deploy-simple.sh
 ./scripts/build-and-deploy-slice.sh
+# ./scripts/build-and-deploy-mp-browse.sh  # Optional - requires your JAR
 ```
 
 Each script will:
@@ -165,6 +182,7 @@ This will test **all deployed client implementations** and show:
 - Results from Custom Client (if deployed)
 - Results from Simple Client (if deployed)  
 - Results from Slice Client (if deployed)
+- Results from MP-Browse (if deployed)
 - Distribution of calls across pods and zones
 - Same-zone vs cross-zone call percentages
 
@@ -369,24 +387,34 @@ kubernetes-loadbalancer/
 │   ├── Dockerfile
 │   └── pom.xml
 │
+├── mp-browse/                         # Production app integration (user provides JAR)
+│   ├── Dockerfile                     # Docker config for your browse-webapp
+│   ├── README.md                      # Detailed setup instructions
+│   ├── .gitignore                     # Excludes app.jar from git
+│   └── app.jar                        # (Not in git - you copy your JAR here)
+│
 ├── k8s/                               # Kubernetes manifests
 │   ├── namespace.yaml
 │   ├── rbac.yaml                      # Includes endpointslices permissions
 │   ├── sample-service.yaml
 │   ├── client-service.yaml
 │   ├── simple-client-service.yaml
-│   └── slice-client-service.yaml
+│   ├── slice-client-service.yaml
+│   └── mp-browse.yaml                 # Your production app deployment
 │
 ├── scripts/                           # Helper scripts
 │   ├── setup-kind-cluster.sh          # Create Kind cluster
 │   ├── build-and-deploy.sh            # Build/deploy custom client
 │   ├── build-and-deploy-simple.sh     # Build/deploy simple client
 │   ├── build-and-deploy-slice.sh      # Build/deploy slice client
+│   ├── build-and-deploy-mp-browse.sh  # Build/deploy your production app
 │   ├── test-loadbalancing.sh          # Compare all implementations
 │   ├── debug-simple-client.sh         # Remote debugging setup
 │   ├── port-forward.sh
 │   ├── logs.sh
-│   └── cleanup.sh
+│   ├── cleanup.sh
+│   ├── cleanup-all.sh
+│   └── destroy-cluster.sh
 │
 ├── SPRING_CLOUD_ISSUE.md              # Ready-to-submit GitHub issue
 ├── FINDINGS_SUMMARY.md                # Complete investigation summary

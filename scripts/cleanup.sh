@@ -20,6 +20,14 @@ else
     echo "Cluster '${CLUSTER_NAME}' not found"
 fi
 
+# Clean up leftover Kind network if it exists
+if docker network ls | grep -q "^kind"; then
+    echo "Removing leftover Kind network..."
+    docker network rm kind 2>/dev/null || echo "  (Kind network already removed)"
+else
+    echo "✓ No leftover Kind network"
+fi
+
 echo ""
 echo "✓ Cleanup complete!"
 echo ""

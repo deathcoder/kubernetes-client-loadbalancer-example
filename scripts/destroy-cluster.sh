@@ -24,6 +24,15 @@ if kind get clusters 2>/dev/null | grep -q "^${CLUSTER_NAME}$"; then
         echo "Deleting Kind cluster..."
         kind delete cluster --name ${CLUSTER_NAME}
         
+        # Clean up leftover Kind network if it exists
+        echo ""
+        echo "Cleaning up Kind network..."
+        if docker network ls | grep -q "kind"; then
+            docker network rm kind 2>/dev/null && echo "✓ Kind network removed" || echo "✓ Kind network already removed"
+        else
+            echo "✓ No leftover Kind network"
+        fi
+        
         echo ""
         echo "========================================"
         echo "Cluster Destroyed Successfully!"

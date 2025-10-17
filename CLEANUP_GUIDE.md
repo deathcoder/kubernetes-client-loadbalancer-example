@@ -206,6 +206,26 @@ kind delete cluster --name lb-demo
 kind get clusters
 ```
 
+### Cluster won't recreate after deletion
+If you get an error like:
+```
+ERROR: failed to create cluster: command "docker run --name lb-demo-control-plane" ... failed with error: exit status 125
+```
+
+This is usually caused by a leftover Kind network. Fix it with:
+```bash
+# Check for leftover Kind network
+docker network ls | grep kind
+
+# Remove the leftover network
+docker network rm kind
+
+# Then recreate the cluster
+./scripts/setup-kind-cluster.sh
+```
+
+**Note**: All cleanup scripts now automatically remove the Kind network to prevent this issue.
+
 ### Docker images persist
 ```bash
 # List images
